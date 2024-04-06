@@ -49,36 +49,38 @@ int main(int argc, char **argv)
     }
     printf("SPI communication successfully setup.\n");
    
-    #define bsize 1024
+    #define bsize 128
 
     unsigned char buf[bsize] = { 1, 4, 9, 16, 25, 36, 49, 64 };
-    
-    int s0 = 0;
-
-    FILE* file = NULL;
-
-    while (1) {
+    long long start = millis();
+    long long laten = 0;
+    for (int i = 0; i < 1000000; i ++) {
+        int l0 = millis();
         transfer(buf, bsize);
+        int l1 = millis();
 
-        int offset = 0;
+        laten += l1 - l0;
 
-        if (s0 == 0){
-            file = fopen("result", "w");
-            s0 = (buf[0] << 24) + (buf[1] <<16) + (buf[2] << 8) + buf[3]; 
-            offset = 4; 
+        for (int j = 0; j < 8; j ++) {
+            if (buf[j] != j + 1) {
+                printf("ERROR %d: %d\n", j, buf[j]);
+            }
         }
-        int q = s0; 
-        if (1024-offset< s0)
-            q=1024-offset;
-
-        fwrite(buf + offset, 1, q, file);
         
-        s0 -= q;
-        if (s0 == 0) {
-            fclose(file);
-            file = NULL;
+        //printf("Data returned: ");
+        //for (int i = 0; i < 8; i ++) printf("%d ", +buf[i]);
+        if (i % 1000 == 999) {
+            printf("%d: ", i + 1);
+            double data  = bsize * 8 * (i + 1);
+            double time  = millis() - start;
+            double total = data / time;
+            printf("%d / %d = %f b/millis, latency of %f\n", (int) data, (int) time, total, ((double) laten) / ((double) i + 1));
         }
+        //break ;
     }
+    long long end = millis();
+
+    printf("%lld %lld: %d", start, end, 1000000 * 8);
 
     return 0;
 }

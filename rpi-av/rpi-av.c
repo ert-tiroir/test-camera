@@ -1,11 +1,6 @@
-
-#include <stdio.h>
-#include <wiringPi.h>
-
-// LED Pin - wiringPi pin 0 is BCM_GPI
-
 #include <stdio.h>
 #include <wiringPiSPI.h>
+#include <wiringPi.h>
 
 #include <stdlib.h>
 
@@ -36,9 +31,8 @@ void transfer (unsigned char* buf, int sze) {
     if (SPI_AVL_offset == SPI_AVL_size) SPI_AVL_offset = 0;
 }
 
-int main(int argc, char **argv)
-{
-    wiringPiSetup();
+int main(){
+      wiringPiSetup();
     pinMode(4, INPUT);
     pinMode(5, INPUT);
 
@@ -48,37 +42,34 @@ int main(int argc, char **argv)
         return -1;
     }
     printf("SPI communication successfully setup.\n");
-   
-    #define bsize 1024
 
-    unsigned char buf[bsize] = { 1, 4, 9, 16, 25, 36, 49, 64 };
-    
-    int s0 = 0;
-
-    FILE* file = NULL;
-
-    while (1) {
-        transfer(buf, bsize);
-
-        int offset = 0;
-
-        if (s0 == 0){
-            file = fopen("result", "w");
-            s0 = (buf[0] << 24) + (buf[1] <<16) + (buf[2] << 8) + buf[3]; 
-            offset = 4; 
-        }
-        int q = s0; 
-        if (1024-offset< s0)
-            q=1024-offset;
-
-        fwrite(buf + offset, 1, q, file);
-        
-        s0 -= q;
-        if (s0 == 0) {
-            fclose(file);
-            file = NULL;
-        }
+    FILE * file = fopen("blink.c","rb");
+    if (file == NULL){
+        printf ("could not open file \n");
+        return 0;
     }
+
+    unsigned char buf[1024] = {};
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    rewind(file); 
+
+    int offset = 4;
+
+   buf[0]= size >> 24;
+   buf[1]= size >> 16; 
+   buf[2]= size >> 8; 
+   buf[3]= size >> 0; 
+
+    while (1){
+        size_t received_bytes = fread (buf + offset, 1, 1024 - offset, file);
+        if (received_bytes <= 0) 
+            break;
+        transfer(buf, 1024);
+        offset = 0;
+    }
+    
+    fclose(file);
 
     return 0;
 }

@@ -1,4 +1,5 @@
 #include "driver/spi_slave.h"
+#include "WiFi.h"
 
 const int SPI_AVL0 = 17;
 const int SPI_AVL1 = 18;
@@ -22,15 +23,9 @@ const int BUFFER_SIZE = 1024;
 
 DMA_ATTR uint8_t recvbuf[BUFFER_SIZE + 1] = { 1, 2, 3, 4, 5, 6, 7, 8 };   
 DMA_ATTR uint8_t txbuf[BUFFER_SIZE + 1]   = { 1, 2, 3, 4, 5, 6, 7, 8 };
-
-#include "esp_wifi.h"
-#include "WiFi.h"
-
-WiFiServer server;
-
 const char* ssid = "NORDLI-ESP32";
 const char* pwd  = "nordli-esp32";
-
+IPAddress ip(192, 168, 0, 1);
 void setup()
 {
   pinMode(SPI_AVL0, OUTPUT);
@@ -61,47 +56,60 @@ void setup()
     };
     ret=spi_slave_initialize(SPI2_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);
 
-  Serial.begin(1000000);
+    Serial.begin(9600);
     if (ret != ESP_OK) {
       Serial.println("\n==========\nINIT ERROR\n==========\n");
       return ;
     }
+    
+ 	WiFi.mode(WIFI_STA);
+ 	WiFi.begin(ssid, pwd);
 
-  // put your setup code here, to run once:
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, pwd);
-  delay(1000);
+    Serial.print("Connecting to network");
+ 	while (WiFi.status() != WL_CONNECTED) {
+ 		delay(500);
+ 		Serial.print(F("."));
+ 	}
+    Serial.println();
 
-  IPAddress ip (192, 168, 0, 1);
-  IPAddress nm (255, 255, 255, 0);
+    spi_slave_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    int cont = 0;
 
-  WiFi.softAPConfig(ip, ip, nm);
+    int s0 = 0; 
 
-  Serial.println(WiFi.softAPIP());
+    while (1) {
+        Serial.println("Attempting to connect...");
+        WiFiClient client;
+        client.connect(ip, 4242);
+        client.setTimeout(50);
 
-  server.begin(4242);
-}
+        if (client && client.connected()) {}
+        else { delay(500); continue ; }
 
-uint8_t buffer[1024];
+        Serial.println("Connected...");
 
-void loop() {
-  WiFiClient client = server.available();
-  if (client) {} else return ;
+        while(1) {
+            t.length = BUFFER_SIZE * 8;
+            t.trans_len = BUFFER_SIZE * 8; 
+            t.rx_buffer= recvbuf;
+            t.tx_buffer = txbuf;
+        
+            /*if (s0 == 0){
+                s0 = (recvbuf[0] << 24) + (recvbuf[1] <<16) + (recvbuf[2] << 8) + recvbuf[3]; 
+                offset = 4; 
+            }
+            int q = s0; 
+            if (1024-offset< s0)
+                q=1024-offset; */
+            client.write(recvbuf, 1024);
 
-  spi_slave_transaction_t t;
-  memset(&t, 0, sizeof(t));
-  int cont = 0;
 
-  while (client.connected()) {
-    if (client.available() >= 1024) {
-        client.read(txbuf, 1024);
+            n++;
 
-        t.length = BUFFER_SIZE * 8;
-        t.trans_len = BUFFER_SIZE * 8; 
-        t.rx_buffer= recvbuf;
-        t.tx_buffer = txbuf;
-        ret=spi_slave_transmit(SPI2_HOST, &t, portMAX_DELAY);
+        }
     }
-  }
 
 }
+
+void loop () {}

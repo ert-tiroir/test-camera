@@ -18,19 +18,10 @@ void spi_slave_post_trans_cb(spi_slave_transaction_t *trans) {
     if (SPI_AVL_offset == SPI_AVL_SIZE) SPI_AVL_offset = 0;
 }
 
-const int BUFFER_SIZE = 1024;
+const int BUFFER_SIZE = 128;
 
 DMA_ATTR uint8_t recvbuf[BUFFER_SIZE + 1] = { 1, 2, 3, 4, 5, 6, 7, 8 };   
 DMA_ATTR uint8_t txbuf[BUFFER_SIZE + 1]   = { 1, 2, 3, 4, 5, 6, 7, 8 };
-
-#include "esp_wifi.h"
-#include "WiFi.h"
-
-WiFiServer server;
-
-const char* ssid = "NORDLI-ESP32";
-const char* pwd  = "nordli-esp32";
-
 void setup()
 {
   pinMode(SPI_AVL0, OUTPUT);
@@ -61,47 +52,26 @@ void setup()
     };
     ret=spi_slave_initialize(SPI2_HOST, &buscfg, &slvcfg, SPI_DMA_CH_AUTO);
 
-  Serial.begin(1000000);
+    Serial.begin(9600);
     if (ret != ESP_OK) {
       Serial.println("\n==========\nINIT ERROR\n==========\n");
       return ;
     }
 
-  // put your setup code here, to run once:
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, pwd);
-  delay(1000);
+    spi_slave_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    int cont = 0;
 
-  IPAddress ip (192, 168, 0, 1);
-  IPAddress nm (255, 255, 255, 0);
-
-  WiFi.softAPConfig(ip, ip, nm);
-
-  Serial.println(WiFi.softAPIP());
-
-  server.begin(4242);
-}
-
-uint8_t buffer[1024];
-
-void loop() {
-  WiFiClient client = server.available();
-  if (client) {} else return ;
-
-  spi_slave_transaction_t t;
-  memset(&t, 0, sizeof(t));
-  int cont = 0;
-
-  while (client.connected()) {
-    if (client.available() >= 1024) {
-        client.read(txbuf, 1024);
-
+    while(1) {
         t.length = BUFFER_SIZE * 8;
         t.trans_len = BUFFER_SIZE * 8; 
         t.rx_buffer= recvbuf;
         t.tx_buffer = txbuf;
+
         ret=spi_slave_transmit(SPI2_HOST, &t, portMAX_DELAY);
+        n++;
     }
-  }
 
 }
+
+void loop () {}
